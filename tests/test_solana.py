@@ -17,15 +17,18 @@ def test_is_error_detects_marker():
 
 
 def test_balance_zero_on_rpc_error(monkeypatch):
+    """An RPC error must raise, not masquerade as a zero balance."""
     s = Solana(["https://example.invalid"])
-    monkeypatch.setattr(s, "call", lambda *a, **k: {"_rpc_error": {"code": -1}})
-    assert s.balance_sol("abc") == 0.0
+    monkeypatch.setattr(s, "call", lambda *a, **k: {"_rpc_error": {"code": -32602}})
+    with pytest.raises(Exception):
+        s.balance_sol("abc")
 
 
-def test_signatures_empty_on_rpc_error(monkeypatch):
+def test_signatures_raise_on_rpc_error(monkeypatch):
     s = Solana(["https://example.invalid"])
-    monkeypatch.setattr(s, "call", lambda *a, **k: {"_rpc_error": {"code": -1}})
-    assert s.signatures("abc") == []
+    monkeypatch.setattr(s, "call", lambda *a, **k: {"_rpc_error": {"code": -32602}})
+    with pytest.raises(Exception):
+        s.signatures("abc")
 
 
 def test_transaction_handles_plain_string_account_keys(monkeypatch):

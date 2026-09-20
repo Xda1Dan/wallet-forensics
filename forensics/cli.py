@@ -291,7 +291,33 @@ def _parse_references(spec: str | None) -> dict[str, str]:
     return references
 
 
+_B58 = set("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+
+
+def _validate_sol_address(address: str | None) -> dict | None:
+    """An error envelope for a missing/malformed Solana address, else None."""
+    if not address:
+        return {"_error": "a Solana address is required for this query",
+                "type": "MissingAddress",
+                "hint": "pass --addr <base58 address>"}
+    if address.lower().startswith("0x") or not 32 <= len(address) <= 44 \
+            or not set(address) <= _B58:
+        return {"_error": f"not a base58 Solana address: {address!r}",
+                "type": "BadAddress",
+                "hint": "Solana addresses are base58, 32-44 chars, no 0x prefix "
+                        "and no characters like 0, O, I or l"}
+    return None
+
+
 def cmd_sol(args) -> dict:
+    if args.what == "tx":
+        if not args.sig:
+            return {"_error": "a transaction signature is required",
+                    "type": "MissingSignature", "hint": "pass --sig <signature>"}
+    else:
+        problem = _validate_sol_address(args.addr)
+        if problem:
+            return problem
     try:
         if args.what == "parsed":
             return Helius().parsed_transactions(args.addr, args.cap)

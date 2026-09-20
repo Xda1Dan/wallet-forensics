@@ -117,16 +117,27 @@ class Solana:
         raise SolanaError(f"all Solana endpoints failed: {errors[-2:]}")
 
     def balance_sol(self, address: str) -> float:
+        """Lamport balance in SOL.
+
+        Raises on an RPC error rather than returning 0.0: a malformed address
+        must not be indistinguishable from a real, empty wallet.
+        """
         result = self.call("getBalance", [address])
-        if is_error(result) or not isinstance(result, dict):
-            return 0.0
+        if is_error(result):
+            raise SolanaError(f"getBalance failed: {result['_rpc_error']}")
+        if not isinstance(result, dict):
+            raise SolanaError("getBalance returned an unexpected response")
         return result.get("value", 0) / LAMPORTS_PER_SOL
 
     def signatures(self, address: str, limit: int = 50) -> list[dict]:
+        """Recent signatures, newest first. Raises on an RPC error."""
         result = self.call("getSignaturesForAddress",
                            [address, {"limit": limit}])
-        if is_error(result) or not isinstance(result, list):
-            return []
+        if is_error(result):
+            raise SolanaError(
+                f"getSignaturesForAddress failed: {result['_rpc_error']}")
+        if not isinstance(result, list):
+            raise SolanaError("getSignaturesForAddress returned an unexpected response")
         return [
             {"signature": s.get("signature"), "slot": s.get("slot"),
              "time": s.get("blockTime"), "err": s.get("err"),
@@ -185,8 +196,11 @@ class Solana:
         """
         signatures = self.call("getSignaturesForAddress",
                                [address, {"limit": min(cap, 1000)}])
-        if is_error(signatures) or not isinstance(signatures, list):
-            return []
+        if is_error(signatures):
+            raise SolanaError(
+                f"getSignaturesForAddress failed: {signatures['_rpc_error']}")
+        if not isinstance(signatures, list):
+            raise SolanaError("getSignaturesForAddress returned an unexpected response")
         rows: list[dict] = []
         for entry in signatures[:cap]:
             result = self.raw_transaction(entry["signature"])
