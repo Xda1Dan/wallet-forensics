@@ -163,4 +163,8 @@ single-purpose: one query, verbose JSON, errors as data.
 
 ## License
 
-MIT.
+MIT. See [LICENSE](LICENSE).
+
+You can use, modify, and redistribute this code, including commercially, as
+long as the copyright notice stays with it. It comes with no warranty: the
+output is raw evidence, not legal advice or a definitive finding.
