@@ -70,7 +70,9 @@ class Solana:
             return None
         message = (result.get("transaction") or {}).get("message") or {}
         meta = result.get("meta") or {}
-        keys = [k.get("pubkey") for k in message.get("accountKeys", [])]
+        # jsonParsed returns {"pubkey": ...}; plain json returns bare strings.
+        keys = [k.get("pubkey") if isinstance(k, dict) else k
+                for k in message.get("accountKeys", [])]
         required = message.get("header", {}).get("numRequiredSignatures", 1)
         return {
             "signature": signature,
