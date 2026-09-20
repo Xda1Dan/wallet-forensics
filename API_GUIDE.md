@@ -51,6 +51,8 @@ reasons; nothing prints a verdict.
 | `flow --addr` | one-hop outbound; the agent chains the rest |
 | `screen --addr --ref name=0xREAL` | annotate spam and poisoning on either chain: homoglyph symbols, no-DEX-pair tokens, mirror amounts, vanity lookalike addresses. Works on canonical rows, so `--chain sol` works too (base58 lookalikes use tighter thresholds than hex). Returns `clean` and `suspected_spam`; the agent decides |
 | `bridge --tx` | resolve a bridge origin tx to its destination chain, recipient and payout tx, via the bridge's own intent API (Relay implemented). Returns `found:false` rather than guessing when the hash is not a known bridge request |
+| `address --addr` | identify an address: `type` (program / wallet / spl_mint / spl_token_account, or EOA / contract on EVM), the `known_label` from the KB, a resolved `name`, and an explorer link. Third-party tags are best-effort and report `unreachable` rather than implying no label |
+| `program --id` | identify a program or contract id (same shape as `address`) |
 | `sol balance\|sigs\|tx\|tokens\|transfers\|flow\|parsed` | Solana via public RPC, or Helius parsed with `HELIUS_KEY`. `tokens` lists SPL balances (Token + Token-2022) with symbols from Jupiter. `transfers`/`flow` paginate Helius for full history; without a key they fall back to keyless `jsonParsed` scanning, which is capped and slower |
 
 `tx`, `transfers` and `flow` include `from_label`/`to_label` from `labels.py`, a

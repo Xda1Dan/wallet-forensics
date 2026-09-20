@@ -71,6 +71,10 @@ python3 kit.py sol flow --addr 5gNX...
 # a bridge hop is a dead end on the origin chain; this says where it landed
 python3 kit.py bridge --tx 3FamWzqjYzfrCjdugowbucFbXrSNjTP3EENQA1U9xpYQ7RpSms49WuTgmoPtwYJy8SdfAT9Jms6n9tTsYrrFWqsd
 
+# what is this address? (bridge vault? exchange? plain wallet?)
+python3 kit.py address --addr 7uTT8Xi5RWXzy7h9XL244GRgEycDYDhLjr3ZyNdXi8pZ
+python3 kit.py program --id 99vQwtBwYtrqqD9YSXbdum3KBdxPAVxYTaQ3cfnJSrN2
+
 # price assets, current or at the moment of the drain
 python3 kit.py price --symbol ETH,BNB,HYPE
 python3 kit.py price --symbol ETH --at 2026-09-19T03:00:00Z
@@ -91,6 +95,8 @@ python3 kit.py price --symbol ETH --at 2026-09-19T03:00:00Z
 | `price` | current or historical USD prices |
 | `screen` | annotate spam / address poisoning |
 | `bridge` | resolve a bridge tx to its destination chain and recipient |
+| `address` | identify an address: type, known label, explorer link |
+| `program` | identify a program/contract id |
 | `sol` | Solana: `balance`, `sigs`, `tx`, `tokens`, `transfers`, `flow`, `parsed` |
 
 ## How a drain is classified
@@ -153,6 +159,7 @@ forensics/
   solana.py     Solana reads: public RPC and Helius
   providers.py  Etherscan and DexScreener
   bridges.py    bridge intent resolution (origin tx -> destination)
+  identify.py   address/program identification: type, label, explorer
   abi.py        selectors and event topics
   units.py      numeric parsing and scaling
   address.py    addresses, EIP-7702, lookalike similarity

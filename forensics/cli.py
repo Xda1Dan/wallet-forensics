@@ -22,6 +22,7 @@ from . import bridges
 from . import chains as chain_registry
 from . import env
 from . import http
+from . import identify
 from . import labels
 from . import spam
 from .abi import EVENTS, SELECTORS, TOPIC_APPROVAL, TOPIC_APPROVAL_FOR_ALL, TOPIC_TRANSFER
@@ -457,6 +458,16 @@ def cmd_bridge(args) -> dict:
     return bridges.resolve(args.tx)
 
 
+def cmd_address(args) -> dict:
+    """Identify an address: type, known label, and explorer links."""
+    return identify.identify(args.addr, args.chain)
+
+
+def cmd_program(args) -> dict:
+    """Identify a program/contract id: name, type, and label."""
+    return identify.identify(args.id, args.chain)
+
+
 # --------------------------------------------------------------------------
 # argument parsing
 # --------------------------------------------------------------------------
@@ -528,6 +539,17 @@ def build_parser() -> argparse.ArgumentParser:
                        help="resolve a bridge tx to its destination chain/recipient")
     p.add_argument("--tx", required=True, help="origin-chain tx hash")
     p.set_defaults(func=cmd_bridge)
+
+    p = sub.add_parser("address",
+                       help="identify an address: type, label, explorer links")
+    p.add_argument("--addr", required=True)
+    p.add_argument("--chain", default=None, help="override chain detection")
+    p.set_defaults(func=cmd_address)
+
+    p = sub.add_parser("program", help="identify a program or contract id")
+    p.add_argument("--id", required=True)
+    p.add_argument("--chain", default=None)
+    p.set_defaults(func=cmd_program)
 
     p = sub.add_parser("sol", help="Solana queries")
     p.add_argument("what",
