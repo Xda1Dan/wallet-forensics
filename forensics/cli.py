@@ -18,6 +18,7 @@ import sys
 
 from . import __version__
 from . import address as addr
+from . import bridges
 from . import chains as chain_registry
 from . import env
 from . import http
@@ -375,6 +376,15 @@ def _sol_client():
     return Solana(), "rpc"
 
 
+def cmd_bridge(args) -> dict:
+    """Resolve a bridge transaction to its destination chain and recipient.
+
+    A drain that bridges out ends at a bridge contract on the origin chain;
+    this reads the bridge's own intent to say where the value actually landed.
+    """
+    return bridges.resolve(args.tx)
+
+
 # --------------------------------------------------------------------------
 # argument parsing
 # --------------------------------------------------------------------------
@@ -441,6 +451,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cap", type=int, default=2000)
     p.add_argument("--no-dex", action="store_true")
     p.set_defaults(func=cmd_screen)
+
+    p = sub.add_parser("bridge",
+                       help="resolve a bridge tx to its destination chain/recipient")
+    p.add_argument("--tx", required=True, help="origin-chain tx hash")
+    p.set_defaults(func=cmd_bridge)
 
     p = sub.add_parser("sol", help="Solana queries")
     p.add_argument("what",

@@ -67,6 +67,9 @@ python3 kit.py screen --chain eth --addr 0xVICTIM --ref collector=0xREAL
 python3 kit.py sol transfers --addr 5gNX... --dir to
 python3 kit.py sol flow --addr 5gNX...
 
+# a bridge hop is a dead end on the origin chain; this says where it landed
+python3 kit.py bridge --tx 3FamWzqjYzfrCjdugowbucFbXrSNjTP3EENQA1U9xpYQ7RpSms49WuTgmoPtwYJy8SdfAT9Jms6n9tTsYrrFWqsd
+
 # price assets, current or at the moment of the drain
 python3 kit.py price --symbol ETH,BNB,HYPE
 python3 kit.py price --symbol ETH --at 2026-09-19T03:00:00Z
@@ -86,6 +89,7 @@ python3 kit.py price --symbol ETH --at 2026-09-19T03:00:00Z
 | `tokens` | ERC-20 balances with symbol/decimals metadata |
 | `price` | current or historical USD prices |
 | `screen` | annotate spam / address poisoning |
+| `bridge` | resolve a bridge tx to its destination chain and recipient |
 | `sol` | Solana: `balance`, `sigs`, `tx`, `transfers`, `flow`, `parsed` |
 
 ## How a drain is classified
@@ -147,6 +151,7 @@ forensics/
   evm.py        EVM reads: public RPC and Alchemy
   solana.py     Solana reads: public RPC and Helius
   providers.py  Etherscan and DexScreener
+  bridges.py    bridge intent resolution (origin tx -> destination)
   abi.py        selectors and event topics
   units.py      numeric parsing and scaling
   address.py    addresses, EIP-7702, lookalike similarity
