@@ -2,7 +2,7 @@
 import pytest
 
 from forensics import http
-from forensics.providers import DexScreener, Etherscan
+from forensics.providers import DexScreener, Etherscan, Jupiter
 
 
 class FakeResponse:
@@ -19,8 +19,10 @@ class FakeResponse:
 @pytest.fixture(autouse=True)
 def _clear_cache():
     DexScreener._cache.clear()
+    Jupiter._cache.clear()
     yield
     DexScreener._cache.clear()
+    Jupiter._cache.clear()
 
 
 def test_has_pair_true_when_pairs_exist(monkeypatch):
@@ -102,3 +104,52 @@ def test_etherscan_call_wraps_transport_error(monkeypatch):
     out = Etherscan(key="k").call(1, "account", "txlist", address="0xabc")
     assert "_rpc_error" in out
     assert out["module"] == "account"
+
+
+# --- Jupiter: Solana token metadata ---------------------------------------
+def test_jupiter_resolves_symbols(monkeypatch):
+    monkeypatch.setattr(http, "get", lambda *a, **k: FakeResponse([
+        {"id": "MINT1", "symbol": "USDC", "name": "USD Coin", "decimals": 6},
+    ]))
+    out = Jupiter.tokens(["MINT1"])
+    assert out["MINT1"]["symbol"] == "USDC"
+    assert out["MINT1"]["decimals"] == 6
+
+
+def test_jupiter_unknown_mint_is_absent(monkeypatch):
+    monkeypatch.setattr(http, "get", lambda *a, **k: FakeResponse([]))
+    assert Jupiter.tokens(["MISSING"]) == {}
+
+
+def test_jupiter_failure_is_not_cached(monkeypatch):
+    """A transient error must not blank the symbol for the whole run."""
+    calls = {"n": 0}
+
+    def flaky(*_a, **_k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise http.RequestError("transient")
+        return FakeResponse([{"id": "MINT1", "symbol": "USDC", "decimals": 6}])
+
+    monkeypatch.setattr(http, "get", flaky)
+    assert Jupiter.tokens(["MINT1"]) == {}          # failure: nothing cached
+    assert Jupiter.tokens(["MINT1"])["MINT1"]["symbol"] == "USDC"
+    assert calls["n"] == 2
+
+
+def test_jupiter_result_is_cached(monkeypatch):
+    calls = {"n": 0}
+
+    def counted(*_a, **_k):
+        calls["n"] += 1
+        return FakeResponse([{"id": "MINT1", "symbol": "USDC", "decimals": 6}])
+
+    monkeypatch.setattr(http, "get", counted)
+    Jupiter.tokens(["MINT1"])
+    Jupiter.tokens(["MINT1"])
+    assert calls["n"] == 1
+
+
+def test_jupiter_non_list_body_is_ignored(monkeypatch):
+    monkeypatch.setattr(http, "get", lambda *a, **k: FakeResponse({"error": "x"}))
+    assert Jupiter.tokens(["MINT1"]) == {}

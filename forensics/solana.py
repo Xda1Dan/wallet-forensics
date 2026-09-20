@@ -26,10 +26,9 @@ from .units import to_units
 LAMPORTS_PER_SOL = 1_000_000_000
 SOL_DECIMALS = 9
 SYSTEM_PROGRAM = "11111111111111111111111111111111"
-TOKEN_PROGRAMS = {
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",   # SPL Token
-    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",   # Token-2022
-}
+TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"      # SPL Token
+TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"  # Token-2022
+TOKEN_PROGRAMS = {TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID}
 
 
 class SolanaError(RuntimeError):
@@ -98,6 +97,35 @@ class Solana:
             decimals = info.get("decimals")
         self._decimals_cache[mint] = decimals
         return decimals
+
+    def token_accounts(self, owner: str) -> list[dict]:
+        """SPL token accounts for an owner, with mint, amount and delegate.
+
+        Covers both the original Token program and Token-2022. A failed query
+        for one program is skipped so the other still returns.
+        """
+        accounts: list[dict] = []
+        for program in (TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID):
+            result = self.call(
+                "getTokenAccountsByOwner",
+                [owner, {"programId": program}, {"encoding": "jsonParsed"}])
+            if is_error(result) or not isinstance(result, dict):
+                continue
+            for entry in result.get("value") or []:
+                parsed = ((entry.get("account") or {}).get("data") or {}).get("parsed") or {}
+                info = parsed.get("info") or {}
+                amount = info.get("tokenAmount") or {}
+                accounts.append({
+                    "account": entry.get("pubkey"),
+                    "mint": info.get("mint"),
+                    "amount": amount.get("uiAmount"),
+                    "amount_raw": amount.get("amount"),
+                    "decimals": amount.get("decimals"),
+                    "delegate": info.get("delegate"),
+                    "state": info.get("state"),
+                    "program": program,
+                })
+        return accounts
 
     def call(self, method: str, params: list):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}

@@ -26,7 +26,7 @@ from . import labels
 from . import spam
 from .abi import EVENTS, SELECTORS, TOPIC_APPROVAL, TOPIC_APPROVAL_FOR_ALL, TOPIC_TRANSFER
 from .evm import Alchemy, Rpc, RpcError, is_error, map_concurrent, normalize_transfer
-from .providers import DexScreener
+from .providers import DexScreener, Jupiter
 from .solana import Helius, Solana, SolanaError
 from .units import to_int, to_units
 
@@ -251,17 +251,66 @@ def cmd_price(args) -> dict:
 def cmd_screen(args) -> dict:
     chain = chain_registry.resolve(args.chain)
     references = _parse_references(args.ref)
+    if chain == "sol":
+        return _screen_sol(args, references)
     alchemy = _alchemy()
     transfers = (alchemy.transfers(chain, args.addr, "from", args.cap, True)
                  + alchemy.transfers(chain, args.addr, "to", args.cap, True))
     transfers = _dedupe_transfers(transfers)
     decimals = alchemy.fill_missing_decimals(chain, transfers)
-    rows, summary = spam.screen(transfers, references, chain,
-                                check_dex=not args.no_dex, decimals_map=decimals)
+    rows = [_transfer_row(t, decimals) for t in transfers]
+    screened, summary = spam.screen(rows, references, chain,
+                                    check_dex=not args.no_dex)
     return {"chain": chain, "addr": args.addr, "references": references,
             "error": alchemy.last_error, "summary": summary,
-            "clean": [r for r in rows if not r["suspected_spam"]],
-            "suspected_spam": [r for r in rows if r["suspected_spam"]]}
+            "clean": [r for r in screened if not r["suspected_spam"]],
+            "suspected_spam": [r for r in screened if r["suspected_spam"]]}
+
+
+def _screen_sol(args, references: dict) -> dict:
+    """Solana screening: canonical rows + symbol resolution, then spam.screen."""
+    client, source = _sol_client()
+    rows = (client.transfers(args.addr, "from", args.cap, True)
+            + client.transfers(args.addr, "to", args.cap, True))
+    rows = _dedupe_sol_transfers(rows)
+    _attach_symbols(rows)
+    screened, summary = spam.screen(rows, references, "sol",
+                                    check_dex=not args.no_dex)
+    screened = [{**r, "from_label": _label(r.get("from")),
+                 "to_label": _label(r.get("to"))} for r in screened]
+    return {"chain": "sol", "addr": args.addr, "source": source,
+            "references": references, "summary": summary,
+            "clean": [r for r in screened if not r["suspected_spam"]],
+            "suspected_spam": [r for r in screened if r["suspected_spam"]]}
+
+
+def _attach_symbols(rows: list[dict]) -> None:
+    """Set ``symbol`` on SPL rows from Jupiter metadata, in place.
+
+    Mutates the rows so a symbol is available to the spam checks without a
+    second data shape. Unknown mints are left without a symbol.
+    """
+    mints = [r["contract"] for r in rows if r.get("category") == "spl" and r.get("contract")]
+    if not mints:
+        return
+    metadata = Jupiter.tokens(mints)
+    for row in rows:
+        if row.get("category") == "spl" and row.get("contract") in metadata:
+            row["symbol"] = metadata[row["contract"]].get("symbol")
+
+
+def _dedupe_sol_transfers(rows: list[dict]) -> list[dict]:
+    """Drop rows repeated across the from/to halves of a screen pull."""
+    seen: set[tuple] = set()
+    unique = []
+    for row in rows:
+        key = (row.get("hash"), row.get("category"), row.get("contract"),
+               row.get("from"), row.get("to"), row.get("amount"))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+    return unique
 
 
 def _dedupe_transfers(transfers: list[dict]) -> list[dict]:
@@ -329,12 +378,35 @@ def cmd_sol(args) -> dict:
             return {"addr": args.addr, "signatures": client.signatures(args.addr, args.cap)}
         if args.what == "tx":
             return _sol_tx(client.transaction(args.sig))
+        if args.what == "tokens":
+            return _sol_tokens(args, client)
         if args.what in ("transfers", "flow"):
             return _sol_transfers(args)
     except Exception as exc:  # noqa: BLE001
         return {"_rpc_error": f"{type(exc).__name__}: {http.redact(str(exc))[:300]}",
                 "hint": "Solana addresses are base58, not 0x...; use --addr"}
-    raise ValueError("sol what must be balance|sigs|tx|transfers|flow|parsed")
+    raise ValueError("sol what must be balance|sigs|tx|tokens|transfers|flow|parsed")
+
+
+def _sol_tokens(args, client) -> dict:
+    """SPL token balances for an owner, with symbol metadata."""
+    accounts = client.token_accounts(args.addr)
+    metadata = Jupiter.tokens([a["mint"] for a in accounts])
+    rows = []
+    for account in accounts:
+        meta = metadata.get(account["mint"]) or {}
+        rows.append({
+            "mint": account["mint"],
+            "symbol": meta.get("symbol"),
+            "name": meta.get("name"),
+            "decimals": account.get("decimals"),
+            "amount": account.get("amount"),
+            "token_account": account.get("account"),
+            "delegate": account.get("delegate"),
+            "program": account.get("program"),
+        })
+    return {"chain": "sol", "addr": args.addr, "count": len(rows),
+            "tokens": rows}
 
 
 def _sol_tx(tx) -> dict:
@@ -459,7 +531,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("sol", help="Solana queries")
     p.add_argument("what",
-                   choices=["balance", "sigs", "tx", "transfers", "flow", "parsed"])
+                   choices=["balance", "sigs", "tx", "tokens", "transfers",
+                            "flow", "parsed"])
     p.add_argument("--addr", default=None)
     p.add_argument("--sig", default=None)
     p.add_argument("--dir", default="from", choices=["from", "to"])

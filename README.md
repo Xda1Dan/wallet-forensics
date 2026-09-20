@@ -62,6 +62,7 @@ python3 kit.py flow --chain arc --addr 0xDRAINER
 
 # flag spam a drainer planted in the history
 python3 kit.py screen --chain eth --addr 0xVICTIM --ref collector=0xREAL
+python3 kit.py screen --chain sol --addr 5gNX... --ref funder=Fncaz...
 
 # Solana: full transfer history and one-hop outbound (native + SPL)
 python3 kit.py sol transfers --addr 5gNX... --dir to
@@ -90,7 +91,7 @@ python3 kit.py price --symbol ETH --at 2026-09-19T03:00:00Z
 | `price` | current or historical USD prices |
 | `screen` | annotate spam / address poisoning |
 | `bridge` | resolve a bridge tx to its destination chain and recipient |
-| `sol` | Solana: `balance`, `sigs`, `tx`, `transfers`, `flow`, `parsed` |
+| `sol` | Solana: `balance`, `sigs`, `tx`, `tokens`, `transfers`, `flow`, `parsed` |
 
 ## How a drain is classified
 
