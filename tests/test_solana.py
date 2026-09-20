@@ -59,6 +59,28 @@ def test_transaction_handles_dict_account_keys(monkeypatch):
     assert s.transaction("sig")["signers"] == ["SignerA"]
 
 
+def test_transaction_uses_signer_flag_when_header_missing(monkeypatch):
+    """Helius jsonParsed omits `header`; the signer flags must win.
+
+    Regression: without this, a co-signed drain tx (attacker + victim) would
+    report only the first account as a signer, hiding the key-compromise proof.
+    """
+    s = Solana(["https://example.invalid"])
+    payload = {
+        "slot": 1, "blockTime": 2,
+        "transaction": {"message": {
+            "accountKeys": [
+                {"pubkey": "Attacker", "signer": True},
+                {"pubkey": "Victim", "signer": True},
+                {"pubkey": "Other", "signer": False},
+            ],
+        }},
+        "meta": {"err": None, "fee": 5000},
+    }
+    monkeypatch.setattr(s, "call", lambda *a, **k: payload)
+    assert s.transaction("sig")["signers"] == ["Attacker", "Victim"]
+
+
 def test_transaction_none_when_missing(monkeypatch):
     s = Solana(["https://example.invalid"])
     monkeypatch.setattr(s, "call", lambda *a, **k: None)

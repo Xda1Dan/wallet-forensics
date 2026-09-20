@@ -301,11 +301,52 @@ def cmd_sol(args) -> dict:
         if args.what == "sigs":
             return {"addr": args.addr, "signatures": client.signatures(args.addr, args.cap)}
         if args.what == "tx":
-            return client.transaction(args.sig)
+            return _sol_tx(client.transaction(args.sig))
+        if args.what in ("transfers", "flow"):
+            return _sol_transfers(args)
     except Exception as exc:  # noqa: BLE001
         return {"_rpc_error": f"{type(exc).__name__}: {http.redact(str(exc))[:300]}",
                 "hint": "Solana addresses are base58, not 0x...; use --addr"}
-    raise ValueError("sol what must be balance|sigs|tx|parsed")
+    raise ValueError("sol what must be balance|sigs|tx|transfers|flow|parsed")
+
+
+def _sol_tx(tx) -> dict:
+    """Annotate a decoded Solana tx with labels and any bridge program.
+
+    A bridge program in the instruction set means value left this chain, which
+    changes the read of a "transfer" completely — surface it, do not bury it.
+    """
+    if not isinstance(tx, dict) or "_rpc_error" in tx:
+        return tx
+    tx["signer_labels"] = [_label(s) for s in tx.get("signers", [])]
+    programs = tx.get("programs") or []
+    tx["program_labels"] = {p: _label(p) for p in programs if _label(p)}
+    bridges = [p for p in programs
+               if (labels.lookup(p) or {}).get("kind") == "bridge"]
+    if bridges:
+        tx["bridge_programs"] = bridges
+        tx["bridge_note"] = ("this transaction invokes a bridge program; the "
+                             "value likely left this chain")
+    return tx
+
+
+def _sol_transfers(args) -> dict:
+    """Shared body for ``sol transfers`` and ``sol flow`` (flow == outbound)."""
+    direction = "from" if args.what == "flow" else args.dir
+    client, source = _sol_client()
+    rows = client.transfers(args.addr, direction=direction, cap=args.cap,
+                            include_dust=args.include_dust)
+    annotated = [{**row, "from_label": _label(row.get("from")),
+                  "to_label": _label(row.get("to"))} for row in rows]
+    return {"chain": "sol", "addr": args.addr, "dir": direction,
+            "source": source, "count": len(annotated), "transfers": annotated}
+
+
+def _sol_client():
+    """Prefer Helius (parsed, paginated); fall back to keyless RPC."""
+    if os.environ.get("HELIUS_KEY"):
+        return Helius(), "helius"
+    return Solana(), "rpc"
 
 
 # --------------------------------------------------------------------------
@@ -376,10 +417,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_screen)
 
     p = sub.add_parser("sol", help="Solana queries")
-    p.add_argument("what", choices=["balance", "sigs", "tx", "parsed"])
+    p.add_argument("what",
+                   choices=["balance", "sigs", "tx", "transfers", "flow", "parsed"])
     p.add_argument("--addr", default=None)
     p.add_argument("--sig", default=None)
-    p.add_argument("--cap", type=int, default=25)
+    p.add_argument("--dir", default="from", choices=["from", "to"])
+    p.add_argument("--cap", type=int, default=2000)
+    p.add_argument("--include-dust", action="store_true")
     p.set_defaults(func=cmd_sol)
 
     return parser

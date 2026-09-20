@@ -50,7 +50,7 @@ reasons; nothing prints a verdict.
 | `price` | Alchemy by symbol, or DexScreener `--token chain:addr` for long-tail |
 | `flow --addr` | one-hop outbound; the agent chains the rest |
 | `screen --addr --ref name=0xREAL` | annotate spam and poisoning: homoglyph symbols, no-DEX-pair tokens, mirror amounts, vanity lookalike addresses. Returns `clean` and `suspected_spam`; the agent decides |
-| `sol balance\|sigs\|tx\|parsed` | Solana via public RPC, or Helius parsed with `HELIUS_KEY` |
+| `sol balance\|sigs\|tx\|transfers\|flow\|parsed` | Solana via public RPC, or Helius parsed with `HELIUS_KEY`. `transfers`/`flow` paginate Helius for full history; without a key they fall back to keyless `jsonParsed` scanning, which is capped and slower |
 
 `tx`, `transfers` and `flow` include `from_label`/`to_label` from `labels.py`, a
 known-address KB of bridges, DEX routers, CEX, launchers and treasuries. Add
@@ -62,6 +62,9 @@ be retried with the range split.
 
 ## Free-tier gotchas
 
+- Public Solana RPCs are **not archive nodes**: `getTransaction` returns
+  `null` for transactions older than the node's retention window (observed on
+  a 15-month-old tx). Use Helius for historical transaction detail.
 - Alchemy's free tier caps `eth_getLogs` to a 10-block range. Full-history log
   scans are not possible on the free key; chunk to 10 blocks or use Etherscan V2.
 - Non-ETH chains reject the `internal` transfer category (BNB, HyperEVM and
