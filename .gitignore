@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets. Keys are read from the environment, never committed.
+.env
+*.key
+
+# Investigation output contains real victim and drainer addresses.
+# Kept out of the repository by default.
+output/
